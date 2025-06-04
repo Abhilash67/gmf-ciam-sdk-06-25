@@ -1,8 +1,9 @@
-// src/types/index.d.ts
+// src/types/index.d.ts - Updated with getUserProfile endpoint support
 export interface CustomEndpoints {
   passwordReset?: string;
   passwordChange?: string;
   userProfileUpdate?: string;
+  getUserProfile?: string; // Custom getUserProfile endpoint
 }
 
 export interface AuthConfig {
@@ -15,7 +16,7 @@ export interface AuthConfig {
   cacheLocation?: string;
   clientSecret?: string; // For server-side operations
   managementApiAudience?: string;
-  customEndpoints?: CustomEndpoints; // New custom endpoints configuration
+  customEndpoints?: CustomEndpoints; // Enhanced with getUserProfile
 }
 
 export interface OktaConfig {
@@ -131,6 +132,25 @@ export interface CustomUserProfileUpdatePayload {
   usermetadata: Record<string, any> | null;
 }
 
+// Custom getUserProfile payload interface
+export interface CustomGetUserProfilePayload {
+  email: string;
+  password: null;
+  firstname: null;
+  lastname: null;
+  usermetadata: null;
+}
+
+// Custom getUserProfile response interface
+export interface CustomGetUserProfileResponse extends UserProfile {
+  // Your API might return additional fields
+  // Add any custom fields your API returns here
+  lastLoginDate?: string;
+  accountStatus?: string;
+  permissions?: string[];
+  // ... any other custom fields your API returns
+}
+
 export interface AuthProvider {
   // Core authentication methods
   login(): Promise<void>;
@@ -147,6 +167,9 @@ export interface AuthProvider {
   // Profile management
   getDetailedUserProfile(): Promise<UserProfile>;
   updateUserProfile(updates: ProfileUpdates): Promise<UserProfile>;
+  
+  // Custom getUserProfile method for testing custom endpoint
+  testCustomGetUserProfile?(): Promise<UserProfile>;
   
   // Error handling methods
   createError(type: ErrorType, message: string, code: string, details?: Record<string, any>): AuthError;
@@ -168,7 +191,7 @@ export interface AuthProvider {
 }
 
 export interface GMFCIAMAuth {
-  createAuthProvider(type: 'auth0' | 'okta', config: AuthConfig | OktaConfig): Promise<AuthProvider>;
+  createAuthProvider(type: 'auth0', config: AuthConfig): Promise<AuthProvider>;
 }
 
 // Error code type - using string literal union instead of const object
@@ -178,6 +201,7 @@ export type AuthErrorCode =
   | 'INCOMPLETE_CONFIG'
   | 'INVALID_DOMAIN'
   | 'LOGIN_CONFIG_ERROR'
+  | 'MISSING_CUSTOM_ENDPOINT' // For missing custom endpoint
   
   // Authentication errors
   | 'NOT_AUTHENTICATED'
@@ -211,6 +235,7 @@ export type AuthErrorCode =
   | 'PROFILE_FETCH_ERROR'
   | 'DETAILED_PROFILE_ERROR'
   | 'PROFILE_UPDATE_ERROR'
+  | 'CUSTOM_PROFILE_FETCH_ERROR' // New error code for custom getUserProfile
   | 'MGMT_TOKEN_ERROR'
   | 'MGMT_API_ERROR'
   
@@ -244,70 +269,6 @@ export type AuthErrorCode =
   | 'LOGOUT_ERROR'
   | 'VERIFY_REQUEST_ERROR'
   | 'REFRESH_OPERATION_ERROR';
-
-// Helper object for error codes (can be used in implementation files, not declaration files)
-declare const AuthErrorCodes: {
-  readonly MISSING_CONFIG: 'MISSING_CONFIG';
-  readonly INCOMPLETE_CONFIG: 'INCOMPLETE_CONFIG';
-  readonly INVALID_DOMAIN: 'INVALID_DOMAIN';
-  readonly LOGIN_CONFIG_ERROR: 'LOGIN_CONFIG_ERROR';
-  readonly NOT_AUTHENTICATED: 'NOT_AUTHENTICATED';
-  readonly INVALID_STATE: 'INVALID_STATE';
-  readonly MISSING_AUTH_CODE: 'MISSING_AUTH_CODE';
-  readonly INCORRECT_PASSWORD: 'INCORRECT_PASSWORD';
-  readonly USER_NOT_FOUND: 'USER_NOT_FOUND';
-  readonly INSUFFICIENT_PERMISSIONS: 'INSUFFICIENT_PERMISSIONS';
-  readonly INVALID_PROFILE_DATA: 'INVALID_PROFILE_DATA';
-  readonly TOKEN_EXPIRED: 'TOKEN_EXPIRED';
-  readonly INVALID_REFRESH_TOKEN: 'INVALID_REFRESH_TOKEN';
-  readonly NO_REFRESH_TOKEN: 'NO_REFRESH_TOKEN';
-  readonly MISSING_REFRESH_TOKEN: 'MISSING_REFRESH_TOKEN';
-  readonly INVALID_ACCESS_TOKEN: 'INVALID_ACCESS_TOKEN';
-  readonly NO_ACCESS_TOKEN: 'NO_ACCESS_TOKEN';
-  readonly MISSING_ACCESS_TOKEN: 'MISSING_ACCESS_TOKEN';
-  readonly NO_MANAGEMENT_TOKEN: 'NO_MANAGEMENT_TOKEN';
-  readonly INVALID_MANAGEMENT_TOKEN: 'INVALID_MANAGEMENT_TOKEN';
-  readonly INVALID_REFRESH_RESPONSE: 'INVALID_REFRESH_RESPONSE';
-  readonly INVALID_MGMT_TOKEN_RESPONSE: 'INVALID_MGMT_TOKEN_RESPONSE';
-  readonly NETWORK_ERROR: 'NETWORK_ERROR';
-  readonly TOKEN_EXCHANGE_ERROR: 'TOKEN_EXCHANGE_ERROR';
-  readonly TOKEN_REFRESH_ERROR: 'TOKEN_REFRESH_ERROR';
-  readonly PASSWORD_RESET_ERROR: 'PASSWORD_RESET_ERROR';
-  readonly PASSWORD_VERIFY_ERROR: 'PASSWORD_VERIFY_ERROR';
-  readonly PASSWORD_UPDATE_ERROR: 'PASSWORD_UPDATE_ERROR';
-  readonly PROFILE_FETCH_ERROR: 'PROFILE_FETCH_ERROR';
-  readonly DETAILED_PROFILE_ERROR: 'DETAILED_PROFILE_ERROR';
-  readonly PROFILE_UPDATE_ERROR: 'PROFILE_UPDATE_ERROR';
-  readonly MGMT_TOKEN_ERROR: 'MGMT_TOKEN_ERROR';
-  readonly MGMT_API_ERROR: 'MGMT_API_ERROR';
-  readonly MISSING_EMAIL: 'MISSING_EMAIL';
-  readonly INVALID_EMAIL_FORMAT: 'INVALID_EMAIL_FORMAT';
-  readonly MISSING_PASSWORDS: 'MISSING_PASSWORDS';
-  readonly INVALID_PASSWORD_TYPE: 'INVALID_PASSWORD_TYPE';
-  readonly PASSWORD_TOO_SHORT: 'PASSWORD_TOO_SHORT';
-  readonly PASSWORD_UNCHANGED: 'PASSWORD_UNCHANGED';
-  readonly INVALID_UPDATES_FORMAT: 'INVALID_UPDATES_FORMAT';
-  readonly EMPTY_UPDATES: 'EMPTY_UPDATES';
-  readonly RESTRICTED_FIELD: 'RESTRICTED_FIELD';
-  readonly INVALID_PHONE_FORMAT: 'INVALID_PHONE_FORMAT';
-  readonly INVALID_AUTH_URL: 'INVALID_AUTH_URL';
-  readonly INVALID_LOGOUT_URL: 'INVALID_LOGOUT_URL';
-  readonly OPERATION_ERROR: 'OPERATION_ERROR';
-  readonly CALLBACK_ERROR: 'CALLBACK_ERROR';
-  readonly LOGIN_INIT_ERROR: 'LOGIN_INIT_ERROR';
-  readonly RESET_REQUEST_ERROR: 'RESET_REQUEST_ERROR';
-  readonly PASSWORD_CHANGE_ERROR: 'PASSWORD_CHANGE_ERROR';
-  readonly PROFILE_RETRIEVAL_ERROR: 'PROFILE_RETRIEVAL_ERROR';
-  readonly DETAILED_PROFILE_RETRIEVAL_ERROR: 'DETAILED_PROFILE_RETRIEVAL_ERROR';
-  readonly PROFILE_UPDATE_OPERATION_ERROR: 'PROFILE_UPDATE_OPERATION_ERROR';
-  readonly TOKEN_RETRIEVAL_ERROR: 'TOKEN_RETRIEVAL_ERROR';
-  readonly TOKEN_REFRESH_FAILED: 'TOKEN_REFRESH_FAILED';
-  readonly LOGOUT_ERROR: 'LOGOUT_ERROR';
-  readonly VERIFY_REQUEST_ERROR: 'VERIFY_REQUEST_ERROR';
-  readonly REFRESH_OPERATION_ERROR: 'REFRESH_OPERATION_ERROR';
-};
-
-export { AuthErrorCodes };
 
 declare const gmfCiamAuth: GMFCIAMAuth;
 export default gmfCiamAuth;

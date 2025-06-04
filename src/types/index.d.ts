@@ -1,4 +1,10 @@
 // src/types/index.d.ts
+export interface CustomEndpoints {
+  passwordReset?: string;
+  passwordChange?: string;
+  userProfileUpdate?: string;
+}
+
 export interface AuthConfig {
   domain: string;
   clientId: string;
@@ -9,6 +15,7 @@ export interface AuthConfig {
   cacheLocation?: string;
   clientSecret?: string; // For server-side operations
   managementApiAudience?: string;
+  customEndpoints?: CustomEndpoints; // New custom endpoints configuration
 }
 
 export interface OktaConfig {
@@ -75,7 +82,7 @@ export interface AuthValidationResult {
   error?: string;
 }
 
-// Profile update types
+// Profile update types - Updated to include firstname/lastname
 export type ProfileUpdates = Partial<Pick<UserProfile, 
   | 'name' 
   | 'given_name' 
@@ -94,7 +101,35 @@ export type ProfileUpdates = Partial<Pick<UserProfile,
   | 'address'
   | 'user_metadata' 
   | 'app_metadata'
->>;
+>> & {
+  firstname?: string; // Additional field for custom endpoint
+  lastname?: string;  // Additional field for custom endpoint
+};
+
+// Custom endpoint payload interfaces
+export interface CustomPasswordResetPayload {
+  email: string;
+  password: null;
+  firstname: null;
+  lastname: null;
+  usermetadata: null;
+}
+
+export interface CustomPasswordChangePayload {
+  email: string;
+  password: string;
+  firstname: string | null;
+  lastname: string | null;
+  usermetadata: Record<string, any> | null;
+}
+
+export interface CustomUserProfileUpdatePayload {
+  email: string;
+  password: null;
+  firstname: string | null;
+  lastname: string | null;
+  usermetadata: Record<string, any> | null;
+}
 
 export interface AuthProvider {
   // Core authentication methods

@@ -53,6 +53,8 @@ export default class Auth0Provider extends AuthProvider {
           passwordChange: config.customEndpoints?.passwordChange, // e.g., 'https://your-api.com/auth/password-change'
           // TODO: Replace with your actual profile update endpoint URL
           userProfileUpdate: config.customEndpoints?.userProfileUpdate, // e.g., 'https://your-api.com/auth/profile-update'
+          // TODO: Replace with your actual getUserProfile endpoint URL
+          getUserProfile: config.customEndpoints?.getUserProfile, // e.g., 'https://your-api.com/auth/get-profile'
         }
       };
 
@@ -425,6 +427,190 @@ export default class Auth0Provider extends AuthProvider {
     return this._refreshToken(this.refreshToken);
   }
 
+  // Updated getUserProfile method with custom endpoint support
+  async getUserProfile(forceRefresh = false) {
+    return this.handleAsync(async () => {
+      console.log("[Auth0Provider] getUserProfile called");
+      
+      if (!this.authenticated || !this.accessToken) {
+        throw this.createAuthError(
+          "User must be authenticated to get profile",
+          'NOT_AUTHENTICATED'
+        );
+      }
+
+      if (this.userProfile && !forceRefresh) {
+        return this.userProfile;
+      }
+
+      if (this.expiresAt && new Date().getTime() >= this.expiresAt) {
+        if (this.refreshToken) {
+          await this.refreshToken();
+        } else {
+          throw this.createTokenError(
+            "Access token expired and no refresh token available",
+            'TOKEN_EXPIRED'
+          );
+        }
+      }
+
+      // Use custom endpoint if configured
+      if (this.config.customEndpoints?.getUserProfile) {
+        return this._callCustomGetUserProfileEndpoint();
+      }
+
+      // Fallback to standard Auth0 userinfo endpoint
+      const userInfoResponse = await fetch(
+        `https://${this.config.domain}/userinfo`,
+        {
+          headers: { Authorization: `Bearer ${this.accessToken}` },
+        }
+      );
+
+      if (!userInfoResponse.ok) {
+        const errorData = await userInfoResponse.json().catch(() => ({}));
+        
+        if (userInfoResponse.status === 401) {
+          throw this.createTokenError(
+            "Access token is invalid or expired",
+            'INVALID_ACCESS_TOKEN'
+          );
+        }
+        
+        throw this.createNetworkError(
+          `Failed to fetch user profile: ${errorData.error_description || errorData.error || 'Unknown error'}`,
+          'PROFILE_FETCH_ERROR',
+          { status: userInfoResponse.status }
+        );
+      }
+
+      const profileData = await userInfoResponse.json();
+      
+      if (!profileData.sub) {
+        throw this.createAuthError(
+          "Invalid user profile data received",
+          'INVALID_PROFILE_DATA'
+        );
+      }
+
+      this.userProfile = profileData;
+      this._saveAuthData();
+
+      return this.userProfile;
+    }, 'Get user profile');
+  }
+
+  // New method for custom getUserProfile endpoint
+  async _callCustomGetUserProfileEndpoint() {
+    // TODO: UPDATE THIS PAYLOAD FORMAT IF YOUR API EXPECTS DIFFERENT FIELD NAMES
+    // Get the user's email from the current token first if we don't have a profile yet
+    let userEmail = this.userProfile?.email;
+    
+    // If we don't have the email yet, get it from the basic Auth0 userinfo
+    if (!userEmail) {
+      try {
+        const basicUserInfo = await fetch(
+          `https://${this.config.domain}/userinfo`,
+          {
+            headers: { Authorization: `Bearer ${this.accessToken}` },
+          }
+        );
+        
+        if (basicUserInfo.ok) {
+          const basicProfile = await basicUserInfo.json();
+          userEmail = basicProfile.email;
+        }
+      } catch (error) {
+        console.warn("[Auth0Provider] Could not get basic user info for custom profile call:", error);
+      }
+    }
+
+    const payload = {
+      email: userEmail || null,
+      password: null,
+      firstname: null,
+      lastname: null,
+      usermetadata: null
+    };
+
+    // TODO: UPDATE THE ENDPOINT URL - THIS SHOULD MATCH YOUR API
+    // The endpoint URL comes from this.config.customEndpoints.getUserProfile
+    const response = await fetch(this.config.customEndpoints.getUserProfile, {
+      method: "POST",
+      headers: { 
+        "Content-Type": "application/json",
+        // TODO: UPDATE AUTHENTICATION HEADER IF YOUR API REQUIRES DIFFERENT FORMAT
+        "Authorization": `Bearer ${this.accessToken}`
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw this.createNetworkError(
+        `Custom getUserProfile failed: ${errorData.message || errorData.error || 'Unknown error'}`,
+        'CUSTOM_PROFILE_FETCH_ERROR',
+        { status: response.status }
+      );
+    }
+
+    const profileData = await response.json();
+    
+    // TODO: UPDATE THESE FIELD MAPPINGS IF YOUR API RETURNS DIFFERENT STRUCTURE
+    // Transform the custom API response to match standard UserProfile interface
+    const standardProfile = {
+      sub: profileData.sub || profileData.id || userEmail, // Use appropriate unique identifier
+      email: profileData.email,
+      name: profileData.name || `${profileData.firstname || ''} ${profileData.lastname || ''}`.trim(),
+      given_name: profileData.given_name || profileData.firstname,
+      family_name: profileData.family_name || profileData.lastname,
+      nickname: profileData.nickname,
+      preferred_username: profileData.preferred_username,
+      profile: profileData.profile,
+      picture: profileData.picture,
+      website: profileData.website,
+      gender: profileData.gender,
+      birthdate: profileData.birthdate,
+      zoneinfo: profileData.zoneinfo,
+      locale: profileData.locale,
+      phone_number: profileData.phone_number,
+      address: profileData.address,
+      user_metadata: profileData.usermetadata || profileData.user_metadata,
+      app_metadata: profileData.app_metadata,
+      // Include any additional custom fields
+      ...profileData
+    };
+
+    this.userProfile = standardProfile;
+    this._saveAuthData();
+
+    return this.userProfile;
+  }
+
+  // Optional test method for custom getUserProfile
+  async testCustomGetUserProfile() {
+    return this.handleAsync(async () => {
+      console.log("[Auth0Provider] testCustomGetUserProfile called");
+      
+      if (!this.config.customEndpoints?.getUserProfile) {
+        throw this.createConfigError(
+          "Custom getUserProfile endpoint is not configured",
+          'MISSING_CUSTOM_ENDPOINT'
+        );
+      }
+
+      if (!this.authenticated || !this.accessToken) {
+        throw this.createAuthError(
+          "User must be authenticated to test custom getUserProfile",
+          'NOT_AUTHENTICATED'
+        );
+      }
+
+      // Force refresh using custom endpoint
+      return this._callCustomGetUserProfileEndpoint();
+    }, 'Test custom getUserProfile');
+  }
+
   // Updated resetPassword method with custom endpoint
   async resetPassword(email) {
     return this.handleAsync(async () => {
@@ -703,72 +889,6 @@ export default class Auth0Provider extends AuthProvider {
         );
       }
     }, 'Password update via Management API');
-  }
-
-  async getUserProfile(forceRefresh = false) {
-    return this.handleAsync(async () => {
-      console.log("[Auth0Provider] getUserProfile called");
-      
-      if (!this.authenticated || !this.accessToken) {
-        throw this.createAuthError(
-          "User must be authenticated to get profile",
-          'NOT_AUTHENTICATED'
-        );
-      }
-
-      if (this.userProfile && !forceRefresh) {
-        return this.userProfile;
-      }
-
-      if (this.expiresAt && new Date().getTime() >= this.expiresAt) {
-        if (this.refreshToken) {
-          await this.refreshToken();
-        } else {
-          throw this.createTokenError(
-            "Access token expired and no refresh token available",
-            'TOKEN_EXPIRED'
-          );
-        }
-      }
-
-      const userInfoResponse = await fetch(
-        `https://${this.config.domain}/userinfo`,
-        {
-          headers: { Authorization: `Bearer ${this.accessToken}` },
-        }
-      );
-
-      if (!userInfoResponse.ok) {
-        const errorData = await userInfoResponse.json().catch(() => ({}));
-        
-        if (userInfoResponse.status === 401) {
-          throw this.createTokenError(
-            "Access token is invalid or expired",
-            'INVALID_ACCESS_TOKEN'
-          );
-        }
-        
-        throw this.createNetworkError(
-          `Failed to fetch user profile: ${errorData.error_description || errorData.error || 'Unknown error'}`,
-          'PROFILE_FETCH_ERROR',
-          { status: userInfoResponse.status }
-        );
-      }
-
-      const profileData = await userInfoResponse.json();
-      
-      if (!profileData.sub) {
-        throw this.createAuthError(
-          "Invalid user profile data received",
-          'INVALID_PROFILE_DATA'
-        );
-      }
-
-      this.userProfile = profileData;
-      this._saveAuthData();
-
-      return this.userProfile;
-    }, 'Get user profile');
   }
 
   async getDetailedUserProfile() {

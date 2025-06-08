@@ -1,4 +1,4 @@
-// Base AuthProvider with error handling utilities
+// Base AuthProvider with error handling utilities - Streamlined version
 export class AuthProvider {
   constructor(config) {
     if (this.constructor === AuthProvider) {
@@ -97,7 +97,7 @@ export class AuthProvider {
     }
   }
 
-  // Abstract methods that must be implemented
+  // Abstract methods that must be implemented - streamlined to match our Auth0Provider
   login() {
     throw new Error("Method 'login()' must be implemented");
   }
@@ -130,12 +130,12 @@ export class AuthProvider {
     throw new Error("Method 'changePassword()' must be implemented");
   }
 
-  getDetailedUserProfile() {
-    throw new Error("Method 'getDetailedUserProfile()' must be implemented");
-  }
-
   updateUserProfile(updates) {
     throw new Error("Method 'updateUserProfile()' must be implemented");
+  }
+
+  getAuthStatus() {
+    throw new Error("Method 'getAuthStatus()' must be implemented");
   }
 }
 
